@@ -11,7 +11,7 @@ import cv2
 import pyrealsense2 as rs
 
 
-CONNECT_SERVER = True  # False for local tests, True for deployment
+CONNECT_SERVER = False  # False for local tests, True for deployment
 
 
 # ----------- DO NOT CHANGE THIS PART -----------
@@ -114,6 +114,10 @@ try:
         previous_time_stamp = start_time
 
         # main control loop:
+        TAGS = {
+            
+        }
+
         while not task_complete and not time.time() - start_time > TIMEOUT:
 
             # avoid busy loops:
@@ -146,6 +150,20 @@ try:
             (detected_corners, detected_ids, rejected) = cv2.aruco.detectMarkers(grey_frame, aruco_dict, parameters=arucoParams)
 
             print(f"Tags in FOV: {detected_ids}")
+            if detected_ids is not None:
+                top_left, top_right, bottom_right, bottom_left = detected_corners[0][0]
+
+                mask = np.zeros(depth_image.shape, dtype=np.uint8)
+                polygon = np.array([[top_left, top_right, bottom_right, bottom_left]], dtype=np.int32)
+                cv2.fillPoly(mask, polygon, 255)
+
+                # Mask the depth image
+                masked_depth = cv2.bitwise_and(depth_image, depth_image, mask=mask)
+
+                # Calculate the mean depth value
+                mean_depth = cv2.mean(depth_image, mask=mask)[0]
+                print(f"Mean depth: {mean_depth}")
+
 
             # --- Compute control ---
 
