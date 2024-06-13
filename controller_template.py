@@ -213,7 +213,6 @@ try:
                     time_since_seen_tags[detected_id] = time.time()
 
                     best_global_position_estimate = TAGS[detected_id]
-                    print(best_global_position_estimate, mean_depth)
                     handling_case = TAG_HANDLING[detected_id]
                     if handling_case == 0:
                         best_global_position_estimate = (best_global_position_estimate[0] - mean_depth, best_global_position_estimate[1])
@@ -223,32 +222,35 @@ try:
                         best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] - mean_depth)
                     elif handling_case == 3:
                         best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] + mean_depth)
-                    print(best_global_position_estimate)
-                else:
-                    ...
+            
+            # Update the global position estimate with the IMU if we haven't seen a tag this frame
+            if detected_ids is None or detected_ids[0,0] not in TAGS:
+                ...
             
             if reached_goal:
                 x_velocity = 0.0
                 y_velocity = 0.0
                 yaw_velocity = 0.0
             else:
-                seen_1_recently = False
-                if time_since_seen_tags[1] and time.time() - time_since_seen_tags[1] < 2.0:
-                    seen_1_recently = True
-
-                if not seen_1_recently:
+                # We haven't seen any tag yet
+                if not best_global_position_estimate:
                     x_velocity = 0.0
                     y_velocity = 0.0
                     yaw_velocity = 1.0
-                if seen_1_recently:
-                    difference_to_goal_in_cm = (best_global_position_estimate[0] - GOAL_POSITION[0], best_global_position_estimate[1] - GOAL_POSITION[1])
-                    distance_to_goal_in_cm = math.sqrt(difference_to_goal_in_cm[0] ** 2 + difference_to_goal_in_cm[1] ** 2)
-                    if distance_to_goal_in_cm > 10:
-                        x_velocity = min(1.0, difference_to_goal_in_cm[0] / 100.0)
-                        y_velocity = -max(min(1.0, difference_to_goal_in_cm[1] / 100.0), -1.0)
-                        yaw_velocity = 0.0
+                # We have an estimate of the robot's position
+                else:
+                    obstacle_in_front = ...
+                    if obstacle_in_front:
+                        ...
                     else:
-                        reached_goal = True
+                        difference_to_goal_in_cm = (best_global_position_estimate[0] - GOAL_POSITION[0], best_global_position_estimate[1] - GOAL_POSITION[1])
+                        distance_to_goal_in_cm = math.sqrt(difference_to_goal_in_cm[0] ** 2 + difference_to_goal_in_cm[1] ** 2)
+                        if distance_to_goal_in_cm > 10:
+                            x_velocity = min(1.0, difference_to_goal_in_cm[0] / 100.0)
+                            y_velocity = -max(min(1.0, difference_to_goal_in_cm[1] / 100.0), -1.0)
+                            yaw_velocity = 0.0
+                        else:
+                            reached_goal = True
 
             # --- Send control to the walking policy ---
 
