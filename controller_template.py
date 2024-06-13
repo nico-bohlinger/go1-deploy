@@ -254,6 +254,9 @@ try:
                             yaw_velocity = 0.0
                         else:
                             reached_goal = True
+                            x_velocity = 0.0
+                            y_velocity = 0.0
+                            yaw_velocity = 0.0
 
             # --- Send control to the walking policy ---
             send(s, x_velocity, y_velocity, yaw_velocity)
