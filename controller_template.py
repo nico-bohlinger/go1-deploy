@@ -5,6 +5,7 @@ This is the template of a python controller script to use with a server-enabled 
 import struct
 import socket
 import time
+import math
 
 import numpy as np
 import cv2
@@ -114,6 +115,8 @@ try:
         previous_time_stamp = start_time
 
         # main control loop:
+        GOAL_POSITION = (0, 0)
+
         TAGS = {
             1: (-58, 0),
             2: (32, 117.5),
@@ -124,10 +127,10 @@ try:
         }
         # 0 -> subtract x, 1 -> add x, 2 -> subtract y, 3 -> add y
         TAG_HANDLING = {
-            1: 0,
+            1: 1,
             2: 2,
             3: 2,
-            4: 1,
+            4: 0,
             5: 3,
             6: 3
         }
@@ -136,6 +139,26 @@ try:
         ROBOT_CAMERA_OFFSET_IN_CM = 26.0
 
         best_global_position_estimate = None
+        best_global_yaw_estimate = None
+
+        last_distance_to_tags_in_cm = {
+            1: None,
+            2: None,
+            3: None,
+            4: None,
+            5: None,
+            6: None
+        }
+        time_since_seen_tags = {
+            1: None,
+            2: None,
+            3: None,
+            4: None,
+            5: None,
+            6: None
+        }
+        reached_goal = False
+
 
         while not task_complete and not time.time() - start_time > TIMEOUT:
 
@@ -169,7 +192,9 @@ try:
             (detected_corners, detected_ids, rejected) = cv2.aruco.detectMarkers(grey_frame, aruco_dict, parameters=arucoParams)
 
             if detected_ids is not None:
-                if detected_ids[0] in TAGS:
+                detected_id = detected_ids[0,0]
+                if detected_id in TAGS:
+                    detected_id = 1
                     top_left, top_right, bottom_right, bottom_left = detected_corners[0][0]
 
                     mask = np.zeros(depth_image.shape, dtype=np.uint8)
@@ -180,12 +205,16 @@ try:
                     masked_depth = cv2.bitwise_and(depth_image, depth_image, mask=mask)
 
                     # Calculate the mean depth value
-                    mean_depth = cv2.mean(depth_image, mask=mask)[0]
+                    mean_depth = (cv2.mean(depth_image, mask=mask)[0]) / 10.0
 
                     mean_depth += ROBOT_CAMERA_OFFSET_IN_CM
 
-                    best_global_position_estimate = TAGS[detected_ids[0]]
-                    handling_case = TAG_HANDLING[detected_ids[0]]
+                    last_distance_to_tags_in_cm[detected_id] = mean_depth
+                    time_since_seen_tags[detected_id] = time.time()
+
+                    best_global_position_estimate = TAGS[detected_id]
+                    print(best_global_position_estimate, mean_depth)
+                    handling_case = TAG_HANDLING[detected_id]
                     if handling_case == 0:
                         best_global_position_estimate = (best_global_position_estimate[0] - mean_depth, best_global_position_estimate[1])
                     elif handling_case == 1:
@@ -194,21 +223,37 @@ try:
                         best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] - mean_depth)
                     elif handling_case == 3:
                         best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] + mean_depth)
+                    print(best_global_position_estimate)
                 else:
                     ...
             
+            if reached_goal:
+                x_velocity = 0.0
+                y_velocity = 0.0
+                yaw_velocity = 0.0
+            else:
+                seen_1_recently = False
+                if time_since_seen_tags[1] and time.time() - time_since_seen_tags[1] < 2.0:
+                    seen_1_recently = True
 
-
-
-            # --- Compute control ---
-
-            x_velocity = 0.0
-            y_velocity = 0.0
-            r_velocity = 0.0
+                if not seen_1_recently:
+                    x_velocity = 0.0
+                    y_velocity = 0.0
+                    yaw_velocity = 1.0
+                if seen_1_recently:
+                    difference_to_goal_in_cm = (best_global_position_estimate[0] - GOAL_POSITION[0], best_global_position_estimate[1] - GOAL_POSITION[1])
+                    distance_to_goal_in_cm = math.sqrt(difference_to_goal_in_cm[0] ** 2 + difference_to_goal_in_cm[1] ** 2)
+                    if distance_to_goal_in_cm > 10:
+                        x_velocity = min(1.0, difference_to_goal_in_cm[0] / 100.0)
+                        y_velocity = -max(min(1.0, difference_to_goal_in_cm[1] / 100.0), -1.0)
+                        yaw_velocity = 0.0
+                    else:
+                        reached_goal = True
 
             # --- Send control to the walking policy ---
 
-            send(s, x_velocity, y_velocity, r_velocity)
+            print(x_velocity, y_velocity, yaw_velocity)
+            send(s, x_velocity, y_velocity, yaw_velocity)
 
         print(f"End of main loop.")
 
