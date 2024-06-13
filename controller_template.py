@@ -191,40 +191,43 @@ try:
             grey_frame = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
             (detected_corners, detected_ids, rejected) = cv2.aruco.detectMarkers(grey_frame, aruco_dict, parameters=arucoParams)
 
+            detected_any_tag_id = False
             if detected_ids is not None:
-                detected_id = detected_ids[0,0]
-                if detected_id in TAGS:
-                    detected_id = 1
-                    top_left, top_right, bottom_right, bottom_left = detected_corners[0][0]
+                for detected_id_ in detected_ids:
+                    detected_id = detected_id_[0]
+                    if detected_id in TAGS:
+                        detected_any_tag_id = True
 
-                    mask = np.zeros(depth_image.shape, dtype=np.uint8)
-                    polygon = np.array([[top_left, top_right, bottom_right, bottom_left]], dtype=np.int32)
-                    cv2.fillPoly(mask, polygon, 255)
+                        top_left, top_right, bottom_right, bottom_left = detected_corners[0][0]
 
-                    # Mask the depth image
-                    masked_depth = cv2.bitwise_and(depth_image, depth_image, mask=mask)
+                        mask = np.zeros(depth_image.shape, dtype=np.uint8)
+                        polygon = np.array([[top_left, top_right, bottom_right, bottom_left]], dtype=np.int32)
+                        cv2.fillPoly(mask, polygon, 255)
 
-                    # Calculate the mean depth value
-                    mean_depth = (cv2.mean(depth_image, mask=mask)[0]) / 10.0
+                        # Mask the depth image
+                        masked_depth = cv2.bitwise_and(depth_image, depth_image, mask=mask)
 
-                    mean_depth += ROBOT_CAMERA_OFFSET_IN_CM
+                        # Calculate the mean depth value
+                        mean_depth = (cv2.mean(depth_image, mask=mask)[0]) / 10.0
 
-                    last_distance_to_tags_in_cm[detected_id] = mean_depth
-                    time_since_seen_tags[detected_id] = time.time()
+                        mean_depth += ROBOT_CAMERA_OFFSET_IN_CM
 
-                    best_global_position_estimate = TAGS[detected_id]
-                    handling_case = TAG_HANDLING[detected_id]
-                    if handling_case == 0:
-                        best_global_position_estimate = (best_global_position_estimate[0] - mean_depth, best_global_position_estimate[1])
-                    elif handling_case == 1:
-                        best_global_position_estimate = (best_global_position_estimate[0] + mean_depth, best_global_position_estimate[1])
-                    elif handling_case == 2:
-                        best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] - mean_depth)
-                    elif handling_case == 3:
-                        best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] + mean_depth)
+                        last_distance_to_tags_in_cm[detected_id] = mean_depth
+                        time_since_seen_tags[detected_id] = time.time()
+
+                        best_global_position_estimate = TAGS[detected_id]
+                        handling_case = TAG_HANDLING[detected_id]
+                        if handling_case == 0:
+                            best_global_position_estimate = (best_global_position_estimate[0] - mean_depth, best_global_position_estimate[1])
+                        elif handling_case == 1:
+                            best_global_position_estimate = (best_global_position_estimate[0] + mean_depth, best_global_position_estimate[1])
+                        elif handling_case == 2:
+                            best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] - mean_depth)
+                        elif handling_case == 3:
+                            best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] + mean_depth)
             
             # Update the global position estimate with the IMU if we haven't seen a tag this frame
-            if detected_ids is None or detected_ids[0,0] not in TAGS:
+            if detected_ids is None or not detected_any_tag_id:
                 ...
             
             if reached_goal:
@@ -253,8 +256,6 @@ try:
                             reached_goal = True
 
             # --- Send control to the walking policy ---
-
-            print(x_velocity, y_velocity, yaw_velocity)
             send(s, x_velocity, y_velocity, yaw_velocity)
 
         print(f"End of main loop.")
