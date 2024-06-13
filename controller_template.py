@@ -115,8 +115,27 @@ try:
 
         # main control loop:
         TAGS = {
-            
+            1: (-58, 0),
+            2: (32, 117.5),
+            3: (203, 117.5),
+            4: (293, 0),
+            5: (203, -117.5),
+            6: (32, -117.5)
         }
+        # 0 -> subtract x, 1 -> add x, 2 -> subtract y, 3 -> add y
+        TAG_HANDLING = {
+            1: 0,
+            2: 2,
+            3: 2,
+            4: 1,
+            5: 3,
+            6: 3
+        }
+        
+
+        ROBOT_CAMERA_OFFSET_IN_CM = 26.0
+
+        best_global_position_estimate = None
 
         while not task_complete and not time.time() - start_time > TIMEOUT:
 
@@ -149,20 +168,36 @@ try:
             grey_frame = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
             (detected_corners, detected_ids, rejected) = cv2.aruco.detectMarkers(grey_frame, aruco_dict, parameters=arucoParams)
 
-            print(f"Tags in FOV: {detected_ids}")
             if detected_ids is not None:
-                top_left, top_right, bottom_right, bottom_left = detected_corners[0][0]
+                if detected_ids[0] in TAGS:
+                    top_left, top_right, bottom_right, bottom_left = detected_corners[0][0]
 
-                mask = np.zeros(depth_image.shape, dtype=np.uint8)
-                polygon = np.array([[top_left, top_right, bottom_right, bottom_left]], dtype=np.int32)
-                cv2.fillPoly(mask, polygon, 255)
+                    mask = np.zeros(depth_image.shape, dtype=np.uint8)
+                    polygon = np.array([[top_left, top_right, bottom_right, bottom_left]], dtype=np.int32)
+                    cv2.fillPoly(mask, polygon, 255)
 
-                # Mask the depth image
-                masked_depth = cv2.bitwise_and(depth_image, depth_image, mask=mask)
+                    # Mask the depth image
+                    masked_depth = cv2.bitwise_and(depth_image, depth_image, mask=mask)
 
-                # Calculate the mean depth value
-                mean_depth = cv2.mean(depth_image, mask=mask)[0]
-                print(f"Mean depth: {mean_depth}")
+                    # Calculate the mean depth value
+                    mean_depth = cv2.mean(depth_image, mask=mask)[0]
+
+                    mean_depth += ROBOT_CAMERA_OFFSET_IN_CM
+
+                    best_global_position_estimate = TAGS[detected_ids[0]]
+                    handling_case = TAG_HANDLING[detected_ids[0]]
+                    if handling_case == 0:
+                        best_global_position_estimate = (best_global_position_estimate[0] - mean_depth, best_global_position_estimate[1])
+                    elif handling_case == 1:
+                        best_global_position_estimate = (best_global_position_estimate[0] + mean_depth, best_global_position_estimate[1])
+                    elif handling_case == 2:
+                        best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] - mean_depth)
+                    elif handling_case == 3:
+                        best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] + mean_depth)
+                else:
+                    ...
+            
+
 
 
             # --- Compute control ---
