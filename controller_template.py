@@ -140,10 +140,9 @@ try:
         OBSTACLE_DISTANCE_THRESHOLD_IN_CM = 50.0
 
         best_global_position_estimate = None
-        best_global_yaw_estimate = None
+        best_global_yaw_estimate = 0.0
         best_local_x_velocity_estimate = 0.0
         best_local_y_velocity_estimate = 0.0
-        best_local_yaw_estimate = 0.0
         last_distance_to_tags_in_cm = {
             1: None,
             2: None,
@@ -220,9 +219,6 @@ try:
             print(f"Accelerometer data transformed: {ax}, {ay}, {az}")
             print(f"Gyro data transformed: {gx}, {gy}, {gz}")
 
-            # update yaw estimate
-            best_local_yaw_estimate += gz * MIN_LOOP_DURATION
-
             # --------------- CHANGE THIS PART ---------------
 
             # --- Detect markers ---
@@ -276,6 +272,9 @@ try:
                 global_y_velocity = best_local_x_velocity_estimate * math.sin(best_global_yaw_estimate) + best_local_y_velocity_estimate * math.cos(best_global_yaw_estimate)
                 # velocity in m/s, position in cm, update every 0.1s -> multiply by 10 to get in cm but we need to divide by 10 with the update rate
                 best_global_position_estimate = (best_global_position_estimate[0] + global_x_velocity, best_global_position_estimate[1] + global_y_velocity)
+                # update yaw estimate
+                best_global_yaw_estimate += gz * MIN_LOOP_DURATION
+                best_global_yaw_estimate = best_global_yaw_estimate % (2 * np.pi) # defining limits: 2pi
             
             if reached_goal:
                 x_velocity = 0.0
