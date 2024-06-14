@@ -141,6 +141,8 @@ try:
 
         best_global_position_estimate = None
         best_global_yaw_estimate = None
+        best_local_x_velocity_estimate = 0.0
+        best_local_y_velocity_estimate = 0.0
 
         last_distance_to_tags_in_cm = {
             1: None,
@@ -174,6 +176,20 @@ try:
             frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
             color_frame = frames.get_color_frame()
+            acc_data = frames[2].as_motion_frame().get_motion_data()
+
+            ax, ay, az = acc_data.x, acc_data.y, acc_data.z
+
+            R = np.array([[0, 0, 1],
+            [-1, 0, 0],
+            [0, -1, 0]])
+
+            accel_camera_frame = np.array([ax, ay, az])
+            accel_robot_frame = R @ accel_camera_frame
+
+            best_local_x_velocity_estimate += accel_robot_frame[0] * 0.1
+            best_local_y_velocity_estimate += accel_robot_frame[1] * 0.1
+            
             if not depth_frame or not color_frame:
                 continue
 
@@ -254,7 +270,10 @@ try:
             
             # Update the global position and yaw estimate with the IMU if we haven't seen a tag this frame
             if detected_ids is None or not detected_any_tag_id:
-                ...
+                global_x_velocity = best_local_x_velocity_estimate * math.cos(best_global_yaw_estimate) - best_local_y_velocity_estimate * math.sin(best_global_yaw_estimate)
+                global_y_velocity = best_local_x_velocity_estimate * math.sin(best_global_yaw_estimate) + best_local_y_velocity_estimate * math.cos(best_global_yaw_estimate)
+                # velocity in m/s, position in cm, update every 0.1s -> multiply by 10 to get in cm but we need to divide by 10 with the update rate
+                best_global_position_estimate = (best_global_position_estimate[0] + global_x_velocity, best_global_position_estimate[1] + global_y_velocity)
             
             if reached_goal:
                 x_velocity = 0.0
