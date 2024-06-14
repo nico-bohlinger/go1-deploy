@@ -263,11 +263,11 @@ try:
                     if obstacle_in_front_left or obstacle_in_front_right:
                         if (obstacle_in_front_left and not obstacle_in_front_right) or (obstacle_in_front_left and obstacle_in_front_right and median_depth_in_front_left < median_depth_in_front_right):
                             x_velocity = 0.0
-                            y_velocity = 1.0
+                            y_velocity = -1.0
                             yaw_velocity = heading_vel_to_goal
                         elif (not obstacle_in_front_left and obstacle_in_front_right) or (obstacle_in_front_left and obstacle_in_front_right and median_depth_in_front_left >= median_depth_in_front_right):
                             x_velocity = 0.0
-                            y_velocity = -1.0
+                            y_velocity = 1.0
                             yaw_velocity = heading_vel_to_goal
                     else:
                         difference_to_goal_in_cm = (best_global_position_estimate[0] - GOAL_POSITION[0], best_global_position_estimate[1] - GOAL_POSITION[1])
