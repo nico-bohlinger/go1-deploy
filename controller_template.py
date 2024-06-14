@@ -135,8 +135,9 @@ try:
             6: 3
         }
         
-
         ROBOT_CAMERA_OFFSET_IN_CM = 26.0
+
+        OBSTACLE_DISTANCE_THRESHOLD_IN_CM = 50.0
 
         best_global_position_estimate = None
         best_global_yaw_estimate = None
@@ -219,14 +220,18 @@ try:
                         handling_case = TAG_HANDLING[detected_id]
                         if handling_case == 0:
                             best_global_position_estimate = (best_global_position_estimate[0] - mean_depth, best_global_position_estimate[1])
+                            best_global_yaw_estimate = math.pi
                         elif handling_case == 1:
                             best_global_position_estimate = (best_global_position_estimate[0] + mean_depth, best_global_position_estimate[1])
+                            best_global_yaw_estimate = 0.0
                         elif handling_case == 2:
                             best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] - mean_depth)
+                            best_global_yaw_estimate = -math.pi / 2
                         elif handling_case == 3:
                             best_global_position_estimate = (best_global_position_estimate[0], best_global_position_estimate[1] + mean_depth)
+                            best_global_yaw_estimate = math.pi / 2
             
-            # Update the global position estimate with the IMU if we haven't seen a tag this frame
+            # Update the global position and yaw estimate with the IMU if we haven't seen a tag this frame
             if detected_ids is None or not detected_any_tag_id:
                 ...
             
@@ -242,16 +247,35 @@ try:
                     yaw_velocity = 1.0
                 # We have an estimate of the robot's position
                 else:
-                    obstacle_in_front = ...
-                    if obstacle_in_front:
-                        ...
+                    heading_to_goal = math.atan2(best_global_position_estimate[1] - GOAL_POSITION[1], best_global_position_estimate[0] - GOAL_POSITION[0])
+                    difference_yaw = best_global_yaw_estimate - heading_to_goal
+                    heading_vel_to_goal = max(min(1.0, difference_yaw), -1.0)
+
+                    upper_depth_image = depth_image[:int(image_height * 2 / 3), :]
+                    left_upper_depth_image = upper_depth_image[:, :int(image_width / 2)]
+                    right_upper_depth_image = upper_depth_image[:, int(image_width / 2):]
+
+                    median_depth_in_front_left = np.median(left_upper_depth_image) / 10.0
+                    median_depth_in_front_right = np.median(right_upper_depth_image) / 10.0
+                    obstacle_in_front_left = median_depth_in_front_left < OBSTACLE_DISTANCE_THRESHOLD_IN_CM
+                    obstacle_in_front_right = median_depth_in_front_right < OBSTACLE_DISTANCE_THRESHOLD_IN_CM
+
+                    if obstacle_in_front_left or obstacle_in_front_right:
+                        if (obstacle_in_front_left and not obstacle_in_front_right) or (obstacle_in_front_left and obstacle_in_front_right and median_depth_in_front_left < median_depth_in_front_right):
+                            x_velocity = 0.0
+                            y_velocity = 1.0
+                            yaw_velocity = heading_vel_to_goal
+                        elif (not obstacle_in_front_left and obstacle_in_front_right) or (obstacle_in_front_left and obstacle_in_front_right and median_depth_in_front_left >= median_depth_in_front_right):
+                            x_velocity = 0.0
+                            y_velocity = -1.0
+                            yaw_velocity = heading_vel_to_goal
                     else:
                         difference_to_goal_in_cm = (best_global_position_estimate[0] - GOAL_POSITION[0], best_global_position_estimate[1] - GOAL_POSITION[1])
                         distance_to_goal_in_cm = math.sqrt(difference_to_goal_in_cm[0] ** 2 + difference_to_goal_in_cm[1] ** 2)
                         if distance_to_goal_in_cm > 10:
                             x_velocity = min(1.0, difference_to_goal_in_cm[0] / 100.0)
                             y_velocity = -max(min(1.0, difference_to_goal_in_cm[1] / 100.0), -1.0)
-                            yaw_velocity = 0.0
+                            yaw_velocity = heading_vel_to_goal
                         else:
                             reached_goal = True
                             x_velocity = 0.0
