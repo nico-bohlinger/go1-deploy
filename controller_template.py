@@ -76,7 +76,7 @@ config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, 
 # RGB available FPS: 30Hz
 config.enable_stream(rs.stream.color, image_width, image_height, rs.format.bgr8, 30)
 # # Accelerometer available FPS: {63, 250}Hz
-# config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
+config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
 # # Gyroscope available FPS: {200,400}Hz
 # config.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, 200)
 
@@ -183,6 +183,22 @@ try:
             # Convert images to numpy arrays
             depth_image = np.asanyarray(depth_frame.get_data())
             color_image = np.asanyarray(color_frame.get_data())
+            acc_data = frames[2].as_motion_frame().get_motion_data()
+
+            ax, ay, az = acc_data.x, acc_data.y, acc_data.z
+            print(ax,ay,az)
+
+            # robot x = camera z
+            # robot y = - camera x
+            # robot z = - camera y
+            R = np.array([[0, 0, 1],
+            [-1, 0, 0],
+            [0, -1, 0]])
+
+            accel_camera_frame = np.array([ax, ay, az])
+            accel_robot_frame = R @ accel_camera_frame
+            print(f"Accelerometer data transformed: {ax}, {ay}, {az}")
+
 
             # --------------- CHANGE THIS PART ---------------
 
