@@ -76,7 +76,7 @@ config.enable_stream(rs.stream.depth, image_width, image_height, rs.format.z16, 
 # RGB available FPS: 30Hz
 config.enable_stream(rs.stream.color, image_width, image_height, rs.format.bgr8, 30)
 # # Accelerometer available FPS: {63, 250}Hz
-# config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
+config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, 250)
 # # Gyroscope available FPS: {200,400}Hz
 # config.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, 200)
 
@@ -174,6 +174,22 @@ try:
             frames = pipeline.wait_for_frames()
             depth_frame = frames.get_depth_frame()
             color_frame = frames.get_color_frame()
+            acc_data = frames[2].as_motion_frame().get_motion_data()
+
+            ax, ay, az = acc_data.x, acc_data.y, acc_data.z
+            print(ax,ay,az)
+
+            # robot x = camera z
+            # robot y = - camera x
+            # robot z = - camera y
+            R = np.array([[0, 0, 1],
+            [-1, 0, 0],
+            [0, -1, 0]])
+
+            accel_camera_frame = np.array([ax, ay, az])
+            accel_robot_frame = R @ accel_camera_frame
+            print(f"Accelerometer data transformed: {ax}, {ay}, {az}")
+            
             if not depth_frame or not color_frame:
                 continue
 
