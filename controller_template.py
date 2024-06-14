@@ -143,7 +143,7 @@ try:
         best_global_yaw_estimate = None
         best_local_x_velocity_estimate = 0.0
         best_local_y_velocity_estimate = 0.0
-
+        best_local_yaw_estimate = 0.0
         last_distance_to_tags_in_cm = {
             1: None,
             2: None,
@@ -220,6 +220,8 @@ try:
             print(f"Accelerometer data transformed: {ax}, {ay}, {az}")
             print(f"Gyro data transformed: {gx}, {gy}, {gz}")
 
+            # update yaw estimate
+            best_local_yaw_estimate += gz * MIN_LOOP_DURATION
 
             # --------------- CHANGE THIS PART ---------------
 
